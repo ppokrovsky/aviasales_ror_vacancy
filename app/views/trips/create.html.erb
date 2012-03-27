@@ -1,0 +1,47 @@
+<h1>Trips from <%= params[:origin_iata] %> to <%= params[:destination_iata] %> (<%= @result[:routes].count %>)</h1>
+<ul>
+  <li>Max Stops: <%= params[:max_stops] %></li>
+  <li>Min Departure: <%= params[:min_departure] %></li>
+  <li>Max Price: <%= params[:max_price] %></li>
+  <li>Max Trip Time (hours): <%= params[:max_trip_time] %></li>
+</ul>
+
+<ol>
+<% @result[:routes].each_with_index do |routes, routes_key| %>
+    <li>
+      <ul>
+        <% routes.each_with_index do |route, index| %>
+            <% f = Flight.find(route.name) %>
+            <li>
+              <%= f.origin_iata %> (DEP: <%= f.departure %>) => <%= f.destination_iata %> (ARR: <%= f.arrival %>)
+              @ <%= f.price %>
+              (<i> Flight time:
+                <%= @result[:flight_times][routes_key][index][0] %> days,
+                <%= @result[:flight_times][routes_key][index][1] %> hours,
+                <%= @result[:flight_times][routes_key][index][2] %> minutes,
+              </i>)
+              <br/>
+              <% if @result[:transits][routes_key][index].kind_of?(Array) %>
+                <i>Time in transit:
+                  <%= @result[:transits][routes_key][index][0] %> days,
+                  <%= @result[:transits][routes_key][index][1] %> hours,
+                  <%= @result[:transits][routes_key][index][2] %> minutes
+                </i>
+              <% end %>
+            </li>
+        <% end %>
+        <li><strong>Trip price: <%= @result[:total_prices][routes_key] %></strong></li>
+        <li>
+          <strong>
+            Trip duration:
+            <%= @result[:total_times][routes_key][0] %> days,
+            <%= @result[:total_times][routes_key][1] %> hours,
+            <%= @result[:total_times][routes_key][2] %> minutes
+            (approx <%= @result[:total_times_in_hours][routes_key] %> hours)
+          </strong>
+        </li>
+      </ul>
+      <br>
+    </li>
+<% end %>
+</ol>

@@ -1,0 +1,99 @@
+= Aviasales vacancy task for RoR Developer
+
+== Initial task
+1. Retrieve flight information for one or more flights. Flight may include transit stops
+* Flight data: flight price including all connections
+* Origin and Destination coordinates
+* Dates of departure and arrival
+* Trip duration including connections and flights
+2. Search flights with price, departure date, number of transit stops and trip time constraints. Flight can be combined
+for more complex flights
+
+Response for task 2 must be returned based on data from task 1.
+
+Solution must be implemented using Ruby On Rails
+
+== Solution
+Solution is implemented using n-ary trees with the help of RubyTree gem.
+
+Solution uses following gems in test/development environment
+* _mysql2_ gem for MySQL database interaction. User credentials should be set in database.yml before use
+* _rails-jquery_ gem for JQuery/AJAX
+* _rubytree_ gem for n-ary trees implementation
+* _rspec-rails_ gem for RSpec tests
+* _factory_girl_rails_ gem for advanced db population
+* _ruby-debug19_ gem for debugging purposes
+* _populator_ gem for table population
+* _webrat_ gem for RSpec tests
+
+Necessary migrations are included with project.
+
+Project is built using JetBrains RubyMine IDE version 4.0.2
+
+Project uses GIT for version control, published at GitHub as a private project
+
+Solution includes two models:
+*Flight* model: connected to database table _flights_, which includes:
+* origin and destination IATAs (Airport code, string)
+* departure and arrival time (DateTimeWithZone)
+* flight price (float)
+* airport city name (string)
+
+_flights_ table is populated via custom task *db:populate* ('lib/tasks/populate.rake'). This task uses _Populator_ gem
+to create random flights, which, in turn are intended to simulate real flights, including valid IATAs and departure
+and arrival times
+
+*Trip* model: mostly a virtual model, but inherits ActiveRecord::Base for convenience. "The heart" is *build_trip*
+method which accepts following parameters
+* origin_iata:_string_
+* destination_iata:_string_
+* max_stops:_integer_
+* min_departure:_string_
+* max_price:_float_
+* max_trip_time:_integer_
+
+*origin_iata* and *destination_iata* arguments are mandatory, the rest is optional and is set to nil by default.
+Necessary validations and security sanitizations for parameters are done in the start of "build_trip" method
+
+*build_trip* methods calls various private methods for route validation purposes
+
+*build_trip* methods attempts to build trees starting from origin_iata point and until every leaf of corresponding trip
+is reached. Method queries database table _flights_ to fetch necessary data. Every node of the tree contains
+"_name_" and '_content_' fields, which correspondingly represents flight ID and destination airport IATA. Certain
+improvements can be made at this point, such as populating "_content_" with JSON value, which represents the whole
+flight record from database converted to JSON. Right now, however, method makes a redundant amount of DB requests.
+
+Original trees contain all possible routes from destination. After original trees are built, they evaluated
+against certain mandatory and optional constraints:
+* mandatory constraints, set by business logic:
+- *destination_iata* - if route leaf (aka tree branch leaf) is not equal to destination_iata, branch is removed from tree;
+- *time_loops* - if at some point departure_time is less than arrival_time at next point, branch is removed from tree;
+- *route_loops* - if at some point destination_iata is equal to present node names and it is not designated destination_point,
+branch is removed from tree;
+* optional constraints, set by user:
+- *max_price* - if total price of the trip more than max_price set by user, branch is removed from tree;
+- *max_trip_time* - if total time of the trip in hours more than max_trip_time set by user, branch is removed from tree;
+- *max_stops* - if total amount of transit flights more than max_stops, branch is removed from tree;
+- *min_departure* - if departure time from origin IATA is less than min_departure, branch is removed from tree.
+
+after all validations applied, method produces @result array which includes:
+* _routes_ - array of routes, which include single flight if flight is direct or array of flights if flight
+includes connections
+* _transits_ - array of transit stops which include array of times in format [dd, mm, hh]
+* _flight_times_ - array of flight times which include array of times in format [dd, mm ,hh]
+* _total_prices_ - array of prices, in which every element contains price of the trip as float
+* _total_times_ - array of trip total times in format [dd, mm, hh]
+* _total_times_in_hours_ - array of trip total times in which every element contains duration of trip in hours
+
+"*build_trip*"  method is called from corresponding TripsController using "*new*" action, which renders a form to set
+constraints on search results. View includes a bit of JQuery/Coffescript, which in turn renders Airport city name
+on '*change*' event from IATA drop-down list. This is done just as an example of JQuery/AJAX/Coffescript integration
+and receiving response from FlightsController action in JSON format.
+
+@result is returned as a result of "POST" request to TripsController, which, in turn, calls "create" method.
+@result is passed to view, rendered from "create" action of TripsController. View itself decomposes @result
+array to present response to user.
+
+Detailed comments are integrated in code.
+
+Certain RSpec tests are included with the code as a demonstration of TDD approach.
